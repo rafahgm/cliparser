@@ -119,8 +119,8 @@ impl Flag {
         self
     }
 
-    pub fn required(mut self) -> Self {
-        self.required = true;
+    pub fn required(mut self, required: bool) -> Self {
+        self.required = required;
         self
     }
 

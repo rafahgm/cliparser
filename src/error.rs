@@ -22,7 +22,7 @@ pub enum CliError {
     FlagValueMissing { flag: String },
 
     #[error("Muitos argumentos posicionais fornecidos")]
-    TooManyArguments { flag: String },
+    TooManyArguments,
 
     #[error("Argumentos posicionais insuficientes. Esperado: {expected}, recebido: {received}")]
     NotEnoughArguments { expected: usize, received: usize },
