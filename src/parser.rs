@@ -182,7 +182,7 @@ impl CLIParser {
                 if let Some(default_value) = &flag.default_value {
                     parsed.flags.insert(flag.name.clone(), default_value.clone());
                 }else if flag.required {
-                    return Err(CliError::FlagValueMissing {
+                    return Err(CliError::RequiredFlagNotProvided {
                         flag: flag.name.clone()
                     });
                 }
@@ -195,7 +195,7 @@ impl CLIParser {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Command, Flag, FlagType};
+    use crate::{CliError, Command, Flag, FlagType};
     use crate::flag::FlagValue;
     use crate::parser::CLIParser;
 
@@ -240,5 +240,27 @@ mod tests {
         let result = CLIParser::parse(&command, vec!["--help".to_string()]);
         assert!(result.is_ok());
         assert!(result.unwrap().help_requested);
+    }
+
+    #[test]
+    fn test_missing_required_flag() {
+        let command = Command::new("test")
+            .add_flag(Flag::new("required", FlagType::String).required(true));
+
+        let result = CLIParser::parse(&command, vec![]);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        println!("{:?}", err);
+        assert_eq!(err, CliError::RequiredFlagNotProvided { flag: "required".to_string() });
+    }
+
+    #[test]
+    fn test_unknown_flag() {
+        let command = Command::new("test");
+        let result = CLIParser::parse(&command, vec!["--unknown".to_string()]);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        println!("{:?}", err);
+        assert_eq!(err, CliError::UnknowFlag { flag: "unknown".to_string() });
     }
 }
