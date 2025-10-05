@@ -46,7 +46,7 @@ impl Command {
             flags: HashMap::new(),
             subcommands: HashMap::new(),
             positional_args: Vec::new(),
-            show_help_on_empty: false
+            show_help_on_empty: true
         }
     }
 

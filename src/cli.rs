@@ -1,9 +1,7 @@
-use std::env;
 use crate::parser::CLIParser;
 use crate::ui::ColoredUI;
 use crate::{CliError, Command, Flag, ParsedArgs};
-use std::num::FpCategory::Zero;
-
+use std::env;
 #[derive(Debug, Clone)]
 pub struct CLIApp {
     pub name: String,
@@ -13,9 +11,13 @@ pub struct CLIApp {
 }
 
 impl CLIApp {
-    pub fn new(name: impl Into<String>, version: impl Into<String>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        version: impl Into<String>,
+    ) -> Self {
         let name = name.into();
-        let root_command = Command::new(name.clone());
+        let root_command =
+            Command::new(name.clone());
 
         Self {
             name,
@@ -40,13 +42,17 @@ impl CLIApp {
         self
     }
 
+     pub fn show_help_on_empty(mut self, show_help_on_empty: bool) -> Self {
+        self.root_command = self.root_command.show_help_on_empty(show_help_on_empty);
+        self
+    }
+
     pub fn parse<I, S>(&self, args: I) -> Result<ParsedArgs, CliError>
     where
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
     {
         let args: Vec<String> = args.into_iter().map(|s| s.as_ref().to_string()).collect();
-
         self.parse_from_args(args)
     }
 
@@ -118,7 +124,7 @@ impl CLIApp {
                 ColoredUI::show_error(&error);
                 if let CliError::CommandNotFound { .. }
                 | CliError::SubcommandNotFound { .. }
-                | CliError::UnknowFlag { .. } = error
+                | CliError::UnknownFlag { .. } = error
                 {
                     println!();
                     ColoredUI::show_info("Use --help para obter ajuda");
@@ -142,10 +148,18 @@ impl CLIApp {
         ColoredUI::show_help(&self.name, &self.version, &self.description, command);
     }
 
-    pub fn get_info(&self) -> Vec<String> {
+    pub fn get_info(&self) -> AppInfo {
         let mut commands = Vec::new();
+
         self.collect_commands(&self.root_command, String::new(), &mut commands);
-        commands
+
+        AppInfo {
+            name: self.name.clone(),
+            version: self.version.clone(),
+            description: self.description.clone(),
+            commands: commands,
+            global_flags: self.root_command.flags.len(),
+        }
     }
 
     fn collect_commands(&self, command: &Command, prefix: String, commands: &mut Vec<String>) {
@@ -161,11 +175,12 @@ impl CLIApp {
         }
     }
 
-
     pub fn run_from_env(&self) -> Result<ParsedArgs, CliError> {
         let args: Vec<String> = env::args().skip(1).collect();
         self.run(args)
     }
+
+   
 }
 
 #[derive(Debug, Clone)]

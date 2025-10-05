@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use crate::{CliError, Command, FlagType};
 use crate::flag::FlagValue;
+use crate::{CliError, Command, FlagType};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct ParsedArgs {
@@ -8,7 +8,7 @@ pub struct ParsedArgs {
     pub subcommand: Option<String>,
     pub flags: HashMap<String, FlagValue>,
     pub positional_args: Vec<String>,
-    pub help_requested: bool
+    pub help_requested: bool,
 }
 
 impl ParsedArgs {
@@ -18,7 +18,7 @@ impl ParsedArgs {
             subcommand: None,
             flags: HashMap::new(),
             positional_args: Vec::new(),
-            help_requested: false
+            help_requested: false,
         }
     }
 
@@ -60,15 +60,14 @@ impl CLIParser {
             }
 
             if arg.starts_with("--") {
-                let flag_name = &arg[2..];
+                let flag_name: &str = &arg[2..];
                 i += Self::parse_long_flag(command, &args, &mut i, flag_name, &mut parsed)?;
-            }else if arg.starts_with("-") && arg.len() == 2 {
+            } else if arg.starts_with("-") && arg.len() == 2 {
                 let flag_char = arg.chars().nth(1).unwrap();
                 i += Self::parse_short_flag(command, &args, &mut i, flag_char, &mut parsed)?;
-            }
-            else if let Some(subcommand) = command.get_subcommand(arg) {
+            } else if let Some(subcommand) = command.get_subcommand(arg) {
                 parsed.subcommand = Some(arg.clone());
-                let remaining_args = args[i+1..].to_vec();
+                let remaining_args = args[i + 1..].to_vec();
                 let sub_parsed = Self::parse(subcommand, remaining_args)?;
 
                 parsed.flags.extend(sub_parsed.flags);
@@ -76,13 +75,18 @@ impl CLIParser {
                 parsed.help_requested = sub_parsed.help_requested;
 
                 break;
-            }else {
+            } else if command.has_positional_args() {
                 parsed.positional_args.push(arg.clone());
                 i += 1;
+            }else {
+                return Err(CliError::CommandNotFound { command: arg.clone() })
             }
         }
 
-        Self::validate_positional_args(command, &parsed)?;
+        if command.has_positional_args() {
+            Self::validate_positional_args(command, &parsed)?;
+        }
+
         Self::apply_defaults_and_validate(command, &mut parsed)?;
 
         Ok(parsed)
@@ -93,35 +97,39 @@ impl CLIParser {
         args: &[String],
         i: &mut usize,
         flag_name: &str,
-        parsed: &mut ParsedArgs
+        parsed: &mut ParsedArgs,
     ) -> Result<usize, CliError> {
-        let flag = command.get_flag(flag_name).ok_or_else(|| CliError::UnknowFlag {
-            flag: flag_name.to_string()
-        })?;
+        let flag = command
+            .get_flag(flag_name)
+            .ok_or_else(|| CliError::UnknownFlag {
+                flag: flag_name.to_string(),
+            })?;
 
         match flag.flag_type {
             FlagType::Bool => {
-                parsed.flags.insert(flag_name.to_string(), FlagValue::Bool(true));
+                parsed
+                    .flags
+                    .insert(flag_name.to_string(), FlagValue::Bool(true));
                 Ok(1)
             }
             _ => {
                 if *i + 1 >= args.len() {
                     return Err(CliError::FlagValueMissing {
-                        flag: flag_name.to_string()
+                        flag: flag_name.to_string(),
                     });
                 }
 
                 *i += 1;
                 let value = flag.parse_value(&args[*i])?;
 
-                if matches!(flag.flag_type, FlagType::StringList  | FlagType::IntegerList) {
+                if matches!(flag.flag_type, FlagType::StringList | FlagType::IntegerList) {
                     if let Some(existing) = parsed.flags.get(&flag.name) {
-                        let combined  = Self::combine_list_values(existing, &value)?;
+                        let combined = Self::combine_list_values(existing, &value)?;
                         parsed.flags.insert(flag.name.clone(), combined);
-                    }else {
+                    } else {
                         parsed.flags.insert(flag.name.clone(), value);
                     }
-                }else {
+                } else {
                     parsed.flags.insert(flag.name.clone(), value);
                 }
 
@@ -130,18 +138,26 @@ impl CLIParser {
         }
     }
 
-    fn parse_short_flag(command: &Command, args: &[String], i: &mut usize, flag_char: char, parsed: &mut ParsedArgs) -> Result<usize, CliError> {
-        let flag = command.flags.values()
+    fn parse_short_flag(
+        command: &Command,
+        args: &[String],
+        i: &mut usize,
+        flag_char: char,
+        parsed: &mut ParsedArgs,
+    ) -> Result<usize, CliError> {
+        let flag = command
+            .flags
+            .values()
             .find(|f| f.short == Some(flag_char))
-            .ok_or_else(|| CliError::UnknowFlag {
-                flag: flag_char.to_string()
+            .ok_or_else(|| CliError::UnknownFlag {
+                flag: flag_char.to_string(),
             })?;
 
         Self::parse_long_flag(command, args, i, &flag.name, parsed)
     }
 
     fn combine_list_values(existing: &FlagValue, new: &FlagValue) -> Result<FlagValue, CliError> {
-        match(existing, new) {
+        match (existing, new) {
             (FlagValue::StringList(existing_list), FlagValue::StringList(new_list)) => {
                 let mut combined = existing_list.clone();
                 combined.extend(new_list.clone());
@@ -153,8 +169,8 @@ impl CLIParser {
                 Ok(FlagValue::IntegerList(combined))
             }
             _ => Err(CliError::ParseError {
-                message: "Erro interno: tentativa de combinar valores incompativeis".to_string()
-            })
+                message: "Erro interno: tentativa de combinar valores incompativeis".to_string(),
+            }),
         }
     }
 
@@ -165,7 +181,7 @@ impl CLIParser {
         if provided_count < required_count {
             return Err(CliError::NotEnoughArguments {
                 expected: required_count,
-                received: provided_count
+                received: provided_count,
             });
         }
 
@@ -176,14 +192,20 @@ impl CLIParser {
         Ok(())
     }
 
-    fn apply_defaults_and_validate(command: &Command, parsed: &mut ParsedArgs) -> Result<(), CliError> {
+    fn apply_defaults_and_validate(
+        command: &Command,
+        parsed: &mut ParsedArgs,
+    ) -> Result<(), CliError> {
+
         for flag in command.flags.values() {
             if !parsed.flags.contains_key(&flag.name) {
                 if let Some(default_value) = &flag.default_value {
-                    parsed.flags.insert(flag.name.clone(), default_value.clone());
-                }else if flag.required {
+                    parsed
+                        .flags
+                        .insert(flag.name.clone(), default_value.clone());
+                } else if flag.required {
                     return Err(CliError::RequiredFlagNotProvided {
-                        flag: flag.name.clone()
+                        flag: flag.name.clone(),
                     });
                 }
             }
@@ -195,33 +217,33 @@ impl CLIParser {
 
 #[cfg(test)]
 mod tests {
-    use crate::{CliError, Command, Flag, FlagType};
     use crate::flag::FlagValue;
     use crate::parser::CLIParser;
+    use crate::{CliError, Command, Flag, FlagType};
 
     #[test]
     fn test_parse_simple_command() {
-        let command = Command::new("test")
-            .add_flag(Flag::new("name", FlagType::String).required(true));
+        let command =
+            Command::new("test").add_flag(Flag::new("name", FlagType::String).required(true));
 
-        let result = CLIParser::parse(
-            &command,
-            vec!["--name".to_string(), "rafael".to_string()]
-        );
+        let result = CLIParser::parse(&command, vec!["--name".to_string(), "rafael".to_string()]);
         assert!(result.is_ok());
 
         let parsed = result.unwrap();
         assert_eq!(parsed.command, "test");
         assert_eq!(parsed.flags.len(), 1);
-        assert_eq!(parsed.flags.get("name").unwrap(), &FlagValue::String("rafael".to_string()));
+        assert_eq!(
+            parsed.flags.get("name").unwrap(),
+            &FlagValue::String("rafael".to_string())
+        );
         assert!(parsed.positional_args.is_empty());
         assert!(!parsed.help_requested);
     }
 
     #[test]
     fn test_parse_bool_flag() {
-        let command = Command::new("test")
-            .add_flag(Flag::new("verbose", FlagType::Bool).short('v'));
+        let command =
+            Command::new("test").add_flag(Flag::new("verbose", FlagType::Bool).short('v'));
 
         let result = CLIParser::parse(&command, vec!["-v".to_string()]);
         assert!(result.is_ok());
@@ -245,13 +267,19 @@ mod tests {
     #[test]
     fn test_missing_required_flag() {
         let command = Command::new("test")
-            .add_flag(Flag::new("required", FlagType::String).required(true));
+            .add_flag(Flag::new("required", FlagType::String).required(true))
+            .show_help_on_empty(false);
 
         let result = CLIParser::parse(&command, vec![]);
         assert!(result.is_err());
         let err = result.unwrap_err();
         println!("{:?}", err);
-        assert_eq!(err, CliError::RequiredFlagNotProvided { flag: "required".to_string() });
+        assert_eq!(
+            err,
+            CliError::RequiredFlagNotProvided {
+                flag: "required".to_string()
+            }
+        );
     }
 
     #[test]
@@ -261,6 +289,11 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         println!("{:?}", err);
-        assert_eq!(err, CliError::UnknowFlag { flag: "unknown".to_string() });
+        assert_eq!(
+            err,
+            CliError::UnknownFlag {
+                flag: "unknown".to_string()
+            }
+        );
     }
 }

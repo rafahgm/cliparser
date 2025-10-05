@@ -71,7 +71,7 @@ fn main() {
                 }
             }
         }
-        Err(error) => {
+        Err(_) => {
             std::process::exit(1);
         }
     }

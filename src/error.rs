@@ -13,7 +13,7 @@ pub enum CliError {
     RequiredFlagNotProvided { flag: String },
 
     #[error("Flag desconhecida: --{flag}")]
-    UnknowFlag { flag: String },
+    UnknownFlag { flag: String },
 
     #[error("Valor inválido para flag: --{flag}: {value}. Esperado: {expected}")]
     InvalidFlagValue { flag: String, value: String, expected: String },
