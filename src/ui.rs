@@ -1,6 +1,6 @@
 
 use owo_colors::OwoColorize;
-use crate::{CliError, Command};
+use crate::{AppError, Command};
 
 pub struct ColoredUI;
 
@@ -9,7 +9,7 @@ impl ColoredUI {
         println!("{}", Self::format_help(app_name, version, description, command));
     }
 
-    pub fn show_error(error: &CliError) {
+    pub fn show_error(error: &AppError) {
         eprintln!("{} {}", "[ERROR]".bold().red().on_black(), error);
     }
 

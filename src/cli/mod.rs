@@ -1,16 +1,16 @@
 use crate::parser::CLIParser;
 use crate::ui::ColoredUI;
-use crate::{CliError, Command, Flag, ParsedArgs};
+use crate::{AppError, Command, Flag, ParsedArgs};
 use std::env;
 #[derive(Debug, Clone)]
-pub struct CLIApp {
+pub struct App {
     pub name: String,
     pub version: String,
     pub description: String,
     pub root_command: Command,
 }
 
-impl CLIApp {
+impl App {
     pub fn new(
         name: impl Into<String>,
         version: impl Into<String>,
@@ -47,7 +47,7 @@ impl CLIApp {
         self
     }
 
-    pub fn parse<I, S>(&self, args: I) -> Result<ParsedArgs, CliError>
+    pub fn parse<I, S>(&self, args: I) -> Result<ParsedArgs, AppError>
     where
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
@@ -56,35 +56,35 @@ impl CLIApp {
         self.parse_from_args(args)
     }
 
-    fn parse_from_args(&self, args: Vec<String>) -> Result<ParsedArgs, CliError> {
+    fn parse_from_args(&self, args: Vec<String>) -> Result<ParsedArgs, AppError> {
         CLIParser::parse(&self.root_command, args)
     }
 
-    pub fn validate(&self) -> Result<(), CliError> {
+    pub fn validate(&self) -> Result<(), AppError> {
         self.validate_command(&self.root_command)
     }
 
-    fn validate_command(&self, command: &Command) -> Result<(), CliError> {
+    fn validate_command(&self, command: &Command) -> Result<(), AppError> {
         let mut flag_names = std::collections::HashSet::new();
         let mut short_names = std::collections::HashSet::new();
 
         for flag in command.flags.values() {
             if !flag_names.insert(flag.name.clone()) {
-                return Err(CliError::ConfigurationError {
+                return Err(AppError::ConfigurationError {
                     message: format!("Flag duplicada encontrada: {}", flag.name),
                 });
             }
 
             if let Some(short) = flag.short {
                 if !short_names.insert(short) {
-                    return Err(CliError::ConfigurationError {
+                    return Err(AppError::ConfigurationError {
                         message: format!("Flag curta duplicada encontrada: {}", short),
                     });
                 }
             }
 
             if flag.required && flag.default_value.is_some() {
-                return Err(CliError::ConfigurationError {
+                return Err(AppError::ConfigurationError {
                     message: format!(
                         "Flag '{}' não pode ser obrigatória e ter valor padrão",
                         flag.name
@@ -96,7 +96,7 @@ impl CLIApp {
         let mut subcommand_names = std::collections::HashSet::new();
         for subcommand in command.subcommands.values() {
             if !subcommand_names.insert(subcommand.name.clone()) {
-                return Err(CliError::ConfigurationError {
+                return Err(AppError::ConfigurationError {
                     message: format!("Subcomando duplicado encontrado: {}", subcommand.name),
                 });
             }
@@ -107,7 +107,7 @@ impl CLIApp {
         Ok(())
     }
 
-    pub fn run<I, S>(&self, args: I) -> Result<ParsedArgs, CliError>
+    pub fn run<I, S>(&self, args: I) -> Result<ParsedArgs, AppError>
     where
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
@@ -122,9 +122,9 @@ impl CLIApp {
             }
             Err(error) => {
                 ColoredUI::show_error(&error);
-                if let CliError::CommandNotFound { .. }
-                | CliError::SubcommandNotFound { .. }
-                | CliError::UnknownFlag { .. } = error
+                if let AppError::CommandNotFound { .. }
+                | AppError::SubcommandNotFound { .. }
+                | AppError::UnknownFlag { .. } = error
                 {
                     println!();
                     ColoredUI::show_info("Use --help para obter ajuda");
@@ -175,7 +175,7 @@ impl CLIApp {
         }
     }
 
-    pub fn run_from_env(&self) -> Result<ParsedArgs, CliError> {
+    pub fn run_from_env(&self) -> Result<ParsedArgs, AppError> {
         let args: Vec<String> = env::args().skip(1).collect();
         self.run(args)
     }
@@ -209,61 +209,11 @@ impl AppInfo {
     }
 }
 
-impl Default for CLIApp {
+impl Default for App {
     fn default() -> Self {
         Self::new("app", "0.0.0")
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::{CLIApp, Command, Flag, FlagType};
-
-    #[test]
-    fn test_create_app() {
-        let app = CLIApp::new("app", "1.0.0").description("app teste");
-
-        assert_eq!(app.name, "app");
-        assert_eq!(app.version, "1.0.0");
-        assert_eq!(app.description, "app teste");
-    }
-
-    #[test]
-    fn test_parse_simple_command() {
-        let mut app = CLIApp::new("app", "1.0.0");
-        app = app.add_command(
-            Command::new("hello")
-                .description("Hello World")
-                .add_flag(Flag::new("name", FlagType::String).required(true)),
-        );
-
-        let result = app.parse(vec!["hello", "--name", "Rafael"]);
-        assert!(result.is_ok());
-
-        let parsed = result.unwrap();
-
-        assert_eq!(parsed.command, "app");
-        assert_eq!(parsed.subcommand, Some("hello".to_string()));
-        assert_eq!(
-            parsed.get_flag("name").unwrap().as_string().unwrap(),
-            "Rafael"
-        );
-    }
-
-    #[test]
-    fn test_validation_duplicate_flags() {
-        let app = CLIApp::new("app", "1.0.0")
-            .add_global_flag(Flag::new("name", FlagType::String).required(true))
-            .add_global_flag(Flag::new("name", FlagType::String).required(true));
-
-        assert_eq!(app.root_command.flags.len(), 1);
-    }
-
-    #[test]
-    fn test_help_requested() {
-        let app = CLIApp::new("app", "1.0.0");
-        let result = app.parse(vec!["--help"]);
-        assert!(result.is_ok());
-        assert!(result.unwrap().help_requested);
-    }
-}
+mod tests;

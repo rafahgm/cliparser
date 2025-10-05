@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod integration_tests {
-    use cliparser::{CLIApp, Command, Flag, FlagType, flag::FlagValue};
+    use cliparser::{App, Command, Flag, FlagType, flag::FlagValue};
 
-    fn create_test_app() -> CLIApp {
-        CLIApp::new("test-app", "1.0.0")
+    fn create_test_app() -> App {
+        App::new("test-app", "1.0.0")
             .description("Aplicação de testes")
             .add_global_flag(
                 Flag::new("verbose", FlagType::Bool)
@@ -152,7 +152,7 @@ mod integration_tests {
     fn test_subcommands() {
         let app = create_test_app();
 
-        let result: Result<cliparser::ParsedArgs, cliparser::CliError> = app.parse(vec!["math", "add", "--numbers", "1,2,3"]);
+        let result: Result<cliparser::ParsedArgs, cliparser::AppError> = app.parse(vec!["math", "add", "--numbers", "1,2,3"]);
         assert!(result.is_ok(), "parse falhou com erro {:?}", result.unwrap_err());
 
         let parsed = result.unwrap();
@@ -174,7 +174,7 @@ mod integration_tests {
         assert!(result.is_err(), "parse não retornou um erro, retornou: {:?}", result.unwrap());
 
         match result.unwrap_err() {
-            cliparser::CliError::RequiredFlagNotProvided { flag } => {
+            cliparser::AppError::RequiredFlagNotProvided { flag } => {
                 assert_eq!(flag, "name");
             }
             _ => panic!("Erro esperado: RequiredFlagMissing"),
@@ -189,7 +189,7 @@ mod integration_tests {
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            cliparser::CliError::UnknownFlag { flag } => {
+            cliparser::AppError::UnknownFlag { flag } => {
                 assert_eq!(flag, "unknown");
             }
             _ => panic!("Erro esperado: UnknownFlag"),
@@ -204,7 +204,7 @@ mod integration_tests {
         assert!(result.is_err(), "O parse não retornou um erro, retornou {:?}", result);
 
         match result.unwrap_err() {
-            cliparser::CliError::CommandNotFound { command } => {
+            cliparser::AppError::CommandNotFound { command } => {
                 assert_eq!(command, "unknown-command");
             }
             err => panic!("Erro esperado: CommandNotFound, erro recebido: {:?}", err),
@@ -233,7 +233,7 @@ mod integration_tests {
 
     #[test]
     fn test_flag_value_validation() {
-        let app = CLIApp::new("test", "1.0.0").add_command(
+        let app = App::new("test", "1.0.0").add_command(
             Command::new("test-cmd").add_flag(
                 Flag::new("choice", FlagType::String)
                     .possible_values(vec!["a".to_string(), "b".to_string(), "c".to_string()])
@@ -250,7 +250,7 @@ mod integration_tests {
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            cliparser::CliError::InvalidFlagValue {
+            cliparser::AppError::InvalidFlagValue {
                 flag,
                 value,
                 expected,
@@ -265,7 +265,7 @@ mod integration_tests {
 
     #[test]
     fn test_integer_parsing() {
-        let app = CLIApp::new("test", "1.0.0").add_command(
+        let app = App::new("test", "1.0.0").add_command(
             Command::new("test-cmd")
                 .add_flag(Flag::new("number", FlagType::Integer).required(true)),
         );
@@ -281,7 +281,7 @@ mod integration_tests {
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            cliparser::CliError::InvalidFlagValue {
+            cliparser::AppError::InvalidFlagValue {
                 flag,
                 value,
                 expected,
@@ -296,7 +296,7 @@ mod integration_tests {
 
     #[test]
     fn test_float_parsing() {
-        let app = CLIApp::new("test", "1.0.0").add_command(
+        let app = App::new("test", "1.0.0").add_command(
             Command::new("test-cmd").add_flag(Flag::new("ratio", FlagType::Float).required(true)),
         );
 
@@ -308,7 +308,7 @@ mod integration_tests {
 
     #[test]
     fn test_boolean_flags() {
-        let app = CLIApp::new("test", "1.0.0").add_command(
+        let app = App::new("test", "1.0.0").add_command(
             Command::new("test-cmd")
                 .add_flag(Flag::new("enable", FlagType::Bool))
                 .add_flag(Flag::new("disable", FlagType::Bool)),
@@ -323,14 +323,14 @@ mod integration_tests {
 
     #[test]
     fn test_missing_flag_value() {
-        let app = CLIApp::new("test", "1.0.0")
+        let app = App::new("test", "1.0.0")
             .add_command(Command::new("test-cmd").add_flag(Flag::new("name", FlagType::String)));
 
         let result = app.parse(vec!["test-cmd", "--name"]);
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            cliparser::CliError::FlagValueMissing { flag } => {
+            cliparser::AppError::FlagValueMissing { flag } => {
                 assert_eq!(flag, "name");
             }
             _ => panic!("Erro esperado: FlagValueMissing"),
@@ -344,7 +344,7 @@ mod integration_tests {
         assert!(valid_app.validate().is_ok());
 
         // App com flag obrigatória e valor padrão (deve falhar)
-        let invalid_app = CLIApp::new("invalid", "1.0.0").add_command(
+        let invalid_app = App::new("invalid", "1.0.0").add_command(
             Command::new("cmd").add_flag(
                 Flag::new("bad-flag", FlagType::String)
                     .required(true)
@@ -421,7 +421,7 @@ mod integration_tests {
 
     #[test]
     fn test_empty_args_help() {
-        let app: CLIApp = create_test_app();
+        let app: App = create_test_app();
 
         // Por padrão deve mostrar help quando não há argumentos
         let result = app.parse(Vec::<String>::new());
@@ -452,7 +452,7 @@ mod integration_tests {
 
     #[test]
     fn test_flag_combinations() {
-        let app = CLIApp::new("test", "1.0.0").add_command(
+        let app = App::new("test", "1.0.0").add_command(
             Command::new("cmd")
                 .add_flag(Flag::new("flag1", FlagType::String).short('a'))
                 .add_flag(Flag::new("flag2", FlagType::Integer).short('b'))

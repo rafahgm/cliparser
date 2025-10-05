@@ -1,7 +1,7 @@
-use cliparser::{CLIApp, Command, Flag, FlagType, ParsedArgs};
+use cliparser::{App, Command, Flag, FlagType, ParsedArgs};
 
 fn main() {
-    let app = CLIApp::new("exemplo-basico", "1.0.0")
+    let app = App::new("exemplo-basico", "1.0.0")
         .description("Exemplo básico de uso da biblioteca cliparser")
         .add_command(
             Command::new("hello")

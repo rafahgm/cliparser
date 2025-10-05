@@ -1,8 +1,8 @@
 use thiserror::Error;
-pub type Result<T> = std::result::Result<T, CliError>;
+pub type Result<T> = std::result::Result<T, AppError>;
 
 #[derive(Error, Debug, Clone, PartialEq)]
-pub enum CliError {
+pub enum AppError {
     #[error("Comando não encontrado: {command}")]
     CommandNotFound { command: String },
 
@@ -37,8 +37,8 @@ pub enum CliError {
     ConfigurationError {message: String}
 }
 
-impl From<std::io::Error> for CliError {
+impl From<std::io::Error> for AppError {
     fn from(error: std::io::Error) -> Self {
-        CliError::IoError(error.to_string())
+        AppError::IoError(error.to_string())
     }
 }
